@@ -79,7 +79,6 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
 
     // 1. Cek kondisi matahari (posisi Y)
     if (sunPosition.dy >= 160) {
-      // Malam hari
       newAlerts.add({
         'id': idCounter++,
         'title': '🌙 Efisiensi Surya Rendah',
@@ -89,20 +88,18 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
         'severity': 'warning',
       });
     } else if (sunPosition.dy < 80) {
-      // Siang terik
       newAlerts.add({
         'id': idCounter++,
-        'title': '️ Peringatan Suhu Panel',
+        'title': '☀️ Peringatan Suhu Panel',
         'desc': 'Intensitas cahaya tinggi. Pantau suhu panel surya.',
         'icon': Icons.thermostat,
         'color': Colors.red,
         'severity': 'danger',
       });
     } else {
-      // Sore/pagi
       newAlerts.add({
         'id': idCounter++,
-        'title': '️ Waktu Optimal Produksi',
+        'title': '🌤️ Waktu Optimal Produksi',
         'desc': 'Kondisi cahaya ideal untuk produksi energi surya.',
         'icon': Icons.wb_sunny,
         'color': Colors.orange,
@@ -165,7 +162,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
     } else if (totalEnergyOutput < 3.0) {
       newAlerts.add({
         'id': idCounter++,
-        'title': ' Produksi Energi Rendah',
+        'title': '🔋 Produksi Energi Rendah',
         'desc': 'Total output hanya ${totalEnergyOutput.toStringAsFixed(1)} kW. Periksa sistem.',
         'icon': Icons.battery_alert,
         'color': Colors.red,
@@ -182,7 +179,6 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
       });
     }
 
-    // Update state dengan notifikasi baru
     setState(() {
       systemAlerts = newAlerts;
     });
@@ -228,7 +224,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
   }
 
   // ==========================================
-  // 1. AREA LANGIT (DRAG/PAN) - UPDATE NOTIFIKASI
+  // 1. AREA LANGIT (DRAG/PAN)
   // ==========================================
   Widget _buildSkyArea() {
     return Container(
@@ -250,7 +246,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
                   );
                 });
                 _addRealTimeDataPoint();
-                _generateDynamicAlerts(); // ← Update notifikasi saat matahari digeser
+                _generateDynamicAlerts();
               },
               child: Container(
                 width: 60, height: 60,
@@ -396,7 +392,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
   }
 
   // ==========================================
-  // 4. KARTU GENERATOR (TAP & LONG PRESS) - UPDATE NOTIFIKASI
+  // 4. KARTU GENERATOR (TAP & LONG PRESS)
   // ==========================================
   Widget _buildGeneratorCards() {
     return Padding(
@@ -413,7 +409,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
         onTap: () {
           setState(() => isSolarActive = !isSolarActive);
           _addRealTimeDataPoint();
-          _generateDynamicAlerts(); // ← Update notifikasi saat panel di-toggle
+          _generateDynamicAlerts();
         },
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -439,37 +435,73 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
     );
   }
 
+  // ==========================================
+  // PERBAIKAN: LOGIKA LONG PRESS TURBIN ANGIN
+  // ==========================================
   Widget _buildWindCard() {
     return Card(
-      elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 4, 
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: GestureDetector(
-        onLongPress: () {
+        onLongPress: () async {
+          // 1. Berikan umpan balik getaran
           HapticFeedback.heavyImpact();
-          _showBoostDialog();
-          setState(() => isWindBoosted = !isWindBoosted);
-          _addRealTimeDataPoint();
-          _generateDynamicAlerts(); // ← Update notifikasi saat turbin di-boost
+          
+          // 2. Tunggu keputusan pengguna dari dialog
+          bool? confirm = await _showBoostDialog();
+          
+          // 3. Jika pengguna menekan "Konfirmasi", baru ubah state
+          if (confirm == true) {
+            setState(() {
+              isWindBoosted = !isWindBoosted;
+            });
+            _addRealTimeDataPoint();
+            _generateDynamicAlerts();
+          }
         },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300), padding: const EdgeInsets.all(20),
+          duration: const Duration(milliseconds: 300), 
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
-            gradient: LinearGradient(colors: isWindBoosted 
-              ? [Colors.cyan.shade400, Colors.blue.shade700] 
-              : [Colors.teal.shade300, Colors.teal.shade600]),
+            gradient: LinearGradient(
+              colors: isWindBoosted 
+                ? [Colors.cyan.shade400, Colors.blue.shade700] 
+                : [Colors.teal.shade300, Colors.teal.shade600]
+            ),
           ),
-          child: Row(children: [
-            AnimatedScale(scale: isWindBoosted ? 1.2 : 1.0, duration: const Duration(milliseconds: 300),
-              child: const Icon(Icons.wind_power, size: 50, color: Colors.white)),
-            const SizedBox(width: 20),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text("Turbin Angin", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text(isWindBoosted ? "Mode: BOOST AKTIF" : "Mode: NORMAL", style: TextStyle(color: Colors.white.withOpacity(0.9))),
-              Text("Output: ${isWindBoosted ? 8.0 : 4.0} kW", 
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
-            ])),
-            if (isWindBoosted) const Icon(Icons.rocket_launch, size: 30, color: Colors.yellowAccent)
-          ]),
+          child: Row(
+            children: [
+              AnimatedScale(
+                scale: isWindBoosted ? 1.2 : 1.0, 
+                duration: const Duration(milliseconds: 300),
+                child: const Icon(Icons.wind_power, size: 50, color: Colors.white)
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    const Text(
+                      "Turbin Angin", 
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isWindBoosted ? "Mode: BOOST AKTIF" : "Mode: NORMAL", 
+                      style: TextStyle(color: Colors.white.withOpacity(0.9))
+                    ),
+                    Text(
+                      "Output: ${isWindBoosted ? 8.0 : 4.0} kW", 
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)
+                    ),
+                  ]
+                )
+              ),
+              if (isWindBoosted) 
+                const Icon(Icons.rocket_launch, size: 30, color: Colors.yellowAccent)
+            ],
+          ),
         ),
       ),
     );
@@ -490,7 +522,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
               const Text("Notifikasi & Peringatan Sistem", 
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               TextButton.icon(
-                onPressed: _generateDynamicAlerts, // Tombol refresh manual
+                onPressed: _generateDynamicAlerts,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text("Refresh"),
               ),
@@ -513,7 +545,6 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
                 final alertIcon = alert['icon'] as IconData;
                 final severity = alert['severity'] as String;
 
-                // Warna border berdasarkan severity
                 Color borderColor;
                 switch (severity) {
                   case 'danger': borderColor = Colors.red.shade300; break;
@@ -546,7 +577,7 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: borderColor, width: 2), // Border berwarna
+                      side: BorderSide(color: borderColor, width: 2),
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -577,18 +608,38 @@ class _EnergyDashboardState extends State<EnergyDashboard> {
     );
   }
 
-  void _showBoostDialog() {
-    showDialog(
+  // ==========================================
+  // PERBAIKAN: DIALOG YANG MENGEMBALIKAN NILAI BOOLEAN
+  // ==========================================
+  Future<bool?> _showBoostDialog() {
+    return showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(isWindBoosted ? "Nonaktifkan Boost?" : "Aktifkan Boost Mode?"),
-          content: Text(isWindBoosted 
-            ? "Turbin akan kembali ke output normal (4 kW)."
-            : "Turbin akan dipaksa berputar maksimal (8 kW)."),
+          title: Row(
+            children: [
+              Icon(isWindBoosted ? Icons.wind_power : Icons.rocket_launch, color: Colors.blue),
+              const SizedBox(width: 10),
+              Text(isWindBoosted ? "Nonaktifkan Boost?" : "Aktifkan Boost Mode?"),
+            ],
+          ),
+          content: Text(
+            isWindBoosted 
+              ? "Turbin akan kembali ke output normal (4 kW)."
+              : "Turbin akan dipaksa berputar maksimal (8 kW). Konfirmasi perubahan?"
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Batal")),
-            ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Konfirmasi")),
+            TextButton(
+              // Mengembalikan false jika dibatalkan
+              onPressed: () => Navigator.of(context).pop(false), 
+              child: const Text("Batal"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+              // Mengembalikan true jika dikonfirmasi
+              onPressed: () => Navigator.of(context).pop(true), 
+              child: const Text("Konfirmasi", style: TextStyle(color: Colors.white)),
+            ),
           ],
         );
       },
